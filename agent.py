@@ -2,12 +2,12 @@ from dotenv import load_dotenv
 
 from langchain.chat_models import init_chat_model
 from langchain.agents import create_agent
-from langchain.tool import tool
+from langchain.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
 import wikipedia 
 
-load_dotenv
+load_dotenv()
 
 @tool 
 def calculator(expression: str) -> str:
@@ -24,10 +24,10 @@ def calculator(expression: str) -> str:
 @tool
 def wikipedia_search(query: str) -> str:
     """Look up a topic on wikipedia and returna short summary(2-3 sentences).
-    use this for factual questions about people ,places , events, or cencepts .""""
+    use this for factual questions about people ,places , events, or cencepts ."""
 
     try:
-        return wikipedia.summary(query, sentences=3, auto_suggest = True)
+        return wikipedia.summary(query, sentences=3, auto_suggest = False)
     except wikipedia.exceptions.DisambiguationError as e:
         return f"That query is ambigous. Did you mean one of: {e.options[:5]}?"
     except wikipedia.exceptions.PageError:
@@ -42,44 +42,49 @@ SYSTEM_PROMPT = """ You are the study buddy ,a friendly and precise study assist
                     -'wikipedia_search' - use this when the userasks about a factual topic, person, place or event.
 
                     Always prefer using a tool over guessing. If a tool returns error, tell the user honestly instead 
-                    of making up an answer, Keep answers consice, like a good study partner""""
+                    of making up an answer, Keep answers consice, like a good study partner"""
 
 
 
-model = _init_chat_model(
-    "gemini-2.5-flash",
+model = init_chat_model(
+    "gemini-flash-latest",
     model_provider = "google-genai",
     temperature = 0.3, 
 )
 
-checkpoint = InMemorySaver()  #stores the conversation state
+checkpointer = InMemorySaver()  #stores the conversation state
 
-agent = creat_agent(
-    model = model
+agent = create_agent(
+    model = model,
     tools = [calculator,wikipedia_search],
-    system_prompt = SYSTEM_PROMPT
+    system_prompt = SYSTEM_PROMPT,
     checkpointer = checkpointer,
 )
 
 
-def main()
-
-thread_id = "Study-buddy-session-1"
-print("Study buddy is ready! type 'quit or exit'. \n")
-
-while True:
-    user_input = input("You: ")
-    if user_input.strip().lower() in {"quit", "exit"}:
-        print("Good Bye!")
-        break
+def main():
     
-    result = agent.invoke(
-        {"messages" : [{"role": "user", "content":user_input}]},
-        config = {"configurable": {"thread_id": thread_id}},
-    )
+    thread_id = "Study-buddy-session-1"
+    print("Study buddy is ready! type 'quit or exit'. \n")
 
-    reply = result["messages"][-1].content
-    print(f"Study Buddy: {reply} \n")
+    while True:
+        user_input = input("You: ")
+        if user_input.strip().lower() in {"quit", "exit"}:
+            print("Good Bye!")
+            break
+        
+        result = agent.invoke(
+            {"messages" : [{"role": "user", "content":user_input}]},
+            config = {"configurable": {"thread_id": thread_id}},
+        )
+
+        # reply = result["messages"][-1].content
+        # print(f"Study Buddy: {reply} \n")
+        
+        reply = result["messages"][-1].content              # this new result method because of the gemini model used (it was a bug)
+        if isinstance(reply, list):
+            reply = "".join(block.get("text", "") for block in reply if isinstance(block, dict))
+            print(f"Study Buddy: {reply} \n")
 
 if __name__ == "__main__":
     main()

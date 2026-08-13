@@ -1,5 +1,5 @@
 langchain 
 langchain-google-genai
 langgraph 
-python-dontenv
+python-dotenv
 wikipedia
